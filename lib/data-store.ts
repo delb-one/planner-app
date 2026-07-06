@@ -92,29 +92,52 @@ export async function getRiders(): Promise<Rider[]> {
     }
 
     const seedById = new Map(RIDERS.map((rider) => [rider.id, rider]))
+    const docById = new Map(snapshot.docs.map((doc) => [doc.id, doc]))
 
-    const riders = snapshot.docs
-      .map((doc) => {
-        const data = doc.data()
-        const seed = seedById.get(doc.id)
-        const id =
-          typeof data.id === "string" && data.id ? data.id : doc.id
-        const name =
-          typeof data.name === "string" && data.name
-            ? data.name
-            : seed?.name ?? id
-        const color =
-          typeof data.color === "string" && data.color
-            ? data.color
-            : seed?.color ?? "#71717a"
+    const riders = RIDERS.map((seed) => {
+      const doc = docById.get(seed.id)
+      if (!doc) {
+        return seed
+      }
 
-        return {
-          id,
-          name,
-          color,
-        }
-      })
+      const data = doc.data()
+      const id = typeof data.id === "string" && data.id ? data.id : doc.id
+      const name =
+        typeof data.name === "string" && data.name ? data.name : seed.name
+      const color =
+        typeof data.color === "string" && data.color
+          ? data.color
+          : seed.color
+
+      return {
+        id,
+        name,
+        color,
+      }
+    })
       .filter((rider): rider is Rider => Boolean(rider.id && rider.name))
+      .concat(
+        snapshot.docs
+          .filter((doc) => !seedById.has(doc.id))
+          .map((doc) => {
+            const data = doc.data()
+            const id =
+              typeof data.id === "string" && data.id ? data.id : doc.id
+            const name =
+              typeof data.name === "string" && data.name ? data.name : id
+            const color =
+              typeof data.color === "string" && data.color
+                ? data.color
+                : "#71717a"
+
+            return {
+              id,
+              name,
+              color,
+            }
+          })
+          .filter((rider): rider is Rider => Boolean(rider.id && rider.name)),
+      )
 
     if (riders.length > 0) {
       return riders
