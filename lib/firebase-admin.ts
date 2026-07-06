@@ -14,6 +14,17 @@ type ServiceAccountEnv = {
 
 let firestoreSingleton: ReturnType<typeof getFirestore> | null = null
 
+function normalizePrivateKey(value: string): string {
+  const trimmed = value.trim()
+  const unquoted =
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+      ? trimmed.slice(1, -1)
+      : trimmed
+
+  return unquoted.replace(/\\n/g, "\n").replace(/\r\n/g, "\n")
+}
+
 function readServiceAccountEnv() {
   const raw = process.env.FIREBASE_SERVICE_ACCOUNT_KEY
   if (raw) {
@@ -21,10 +32,11 @@ function readServiceAccountEnv() {
       const parsed = JSON.parse(raw) as ServiceAccountEnv
       const projectId = parsed.project_id ?? parsed.projectId
       const clientEmail = parsed.client_email ?? parsed.clientEmail
-      const privateKey = (parsed.private_key ?? parsed.privateKey)?.replace(
-        /\\n/g,
-        "\n",
-      )
+      const privateKey = parsed.private_key
+        ? normalizePrivateKey(parsed.private_key)
+        : parsed.privateKey
+          ? normalizePrivateKey(parsed.privateKey)
+          : null
 
       if (projectId && clientEmail && privateKey) {
         return cert({
@@ -40,7 +52,9 @@ function readServiceAccountEnv() {
 
   const projectId = process.env.FIREBASE_PROJECT_ID
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n")
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY
+    ? normalizePrivateKey(process.env.FIREBASE_PRIVATE_KEY)
+    : null
 
   if (projectId && clientEmail && privateKey) {
     return cert({
