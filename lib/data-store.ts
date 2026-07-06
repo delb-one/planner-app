@@ -114,30 +114,7 @@ export async function getRiders(): Promise<Rider[]> {
         name,
         color,
       }
-    })
-      .filter((rider): rider is Rider => Boolean(rider.id && rider.name))
-      .concat(
-        snapshot.docs
-          .filter((doc) => !seedById.has(doc.id))
-          .map((doc) => {
-            const data = doc.data()
-            const id =
-              typeof data.id === "string" && data.id ? data.id : doc.id
-            const name =
-              typeof data.name === "string" && data.name ? data.name : id
-            const color =
-              typeof data.color === "string" && data.color
-                ? data.color
-                : "#71717a"
-
-            return {
-              id,
-              name,
-              color,
-            }
-          })
-          .filter((rider): rider is Rider => Boolean(rider.id && rider.name)),
-      )
+    }).filter((rider): rider is Rider => Boolean(rider.id && rider.name))
 
     if (riders.length > 0) {
       return riders
