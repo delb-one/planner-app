@@ -79,10 +79,7 @@ export async function getRiders(): Promise<Rider[]> {
     return RIDERS
   }
 
-  const snapshot = await db
-    .collection(RIDERS_COLLECTION)
-    .orderBy("name")
-    .get()
+  const snapshot = await db.collection(RIDERS_COLLECTION).get()
 
   if (snapshot.empty) {
     const batch = db.batch()
@@ -93,20 +90,36 @@ export async function getRiders(): Promise<Rider[]> {
     return RIDERS
   }
 
-  return snapshot.docs
+  const seedById = new Map(RIDERS.map((rider) => [rider.id, rider]))
+
+  const riders = snapshot.docs
     .map((doc) => {
       const data = doc.data()
-      const name = typeof data.name === "string" ? data.name : null
-      const color = typeof data.color === "string" ? data.color : null
-      return name && color
-        ? {
-            id: doc.id,
-            name,
-            color,
-          }
-        : null
+      const seed = seedById.get(doc.id)
+      const id =
+        typeof data.id === "string" && data.id ? data.id : doc.id
+      const name =
+        typeof data.name === "string" && data.name
+          ? data.name
+          : seed?.name ?? id
+      const color =
+        typeof data.color === "string" && data.color
+          ? data.color
+          : seed?.color ?? "#71717a"
+
+      return {
+        id,
+        name,
+        color,
+      }
     })
-    .filter((rider): rider is Rider => rider !== null)
+    .filter((rider): rider is Rider => Boolean(rider.id && rider.name))
+
+  if (riders.length > 0) {
+    return riders
+  }
+
+  return RIDERS
 }
 
 /** Return every record whose date falls within the given "yyyy-MM" month. */
