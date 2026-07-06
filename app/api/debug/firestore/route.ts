@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 
 import { hasFirestoreConfig, getFirestoreDb } from "@/lib/firebase-admin"
 
+export const runtime = "nodejs"
+
 export async function GET() {
   const configured = hasFirestoreConfig()
   const db = getFirestoreDb()

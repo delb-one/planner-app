@@ -79,47 +79,52 @@ export async function getRiders(): Promise<Rider[]> {
     return RIDERS
   }
 
-  const snapshot = await db.collection(RIDERS_COLLECTION).get()
+  try {
+    const snapshot = await db.collection(RIDERS_COLLECTION).get()
 
-  if (snapshot.empty) {
-    const batch = db.batch()
-    for (const rider of RIDERS) {
-      batch.set(db.collection(RIDERS_COLLECTION).doc(rider.id), rider)
+    if (snapshot.empty) {
+      const batch = db.batch()
+      for (const rider of RIDERS) {
+        batch.set(db.collection(RIDERS_COLLECTION).doc(rider.id), rider)
+      }
+      await batch.commit()
+      return RIDERS
     }
-    await batch.commit()
+
+    const seedById = new Map(RIDERS.map((rider) => [rider.id, rider]))
+
+    const riders = snapshot.docs
+      .map((doc) => {
+        const data = doc.data()
+        const seed = seedById.get(doc.id)
+        const id =
+          typeof data.id === "string" && data.id ? data.id : doc.id
+        const name =
+          typeof data.name === "string" && data.name
+            ? data.name
+            : seed?.name ?? id
+        const color =
+          typeof data.color === "string" && data.color
+            ? data.color
+            : seed?.color ?? "#71717a"
+
+        return {
+          id,
+          name,
+          color,
+        }
+      })
+      .filter((rider): rider is Rider => Boolean(rider.id && rider.name))
+
+    if (riders.length > 0) {
+      return riders
+    }
+
+    return RIDERS
+  } catch (error) {
+    console.error("[data-store] getRiders failed", error)
     return RIDERS
   }
-
-  const seedById = new Map(RIDERS.map((rider) => [rider.id, rider]))
-
-  const riders = snapshot.docs
-    .map((doc) => {
-      const data = doc.data()
-      const seed = seedById.get(doc.id)
-      const id =
-        typeof data.id === "string" && data.id ? data.id : doc.id
-      const name =
-        typeof data.name === "string" && data.name
-          ? data.name
-          : seed?.name ?? id
-      const color =
-        typeof data.color === "string" && data.color
-          ? data.color
-          : seed?.color ?? "#71717a"
-
-      return {
-        id,
-        name,
-        color,
-      }
-    })
-    .filter((rider): rider is Rider => Boolean(rider.id && rider.name))
-
-  if (riders.length > 0) {
-    return riders
-  }
-
-  return RIDERS
 }
 
 /** Return every record whose date falls within the given "yyyy-MM" month. */
@@ -137,16 +142,30 @@ export async function getAvailabilityForMonth(
     return records
   }
 
-  const snapshot = await db
-    .collection(AVAILABILITY_COLLECTION)
-    .where("month", "==", month)
-    .get()
+  try {
+    const snapshot = await db
+      .collection(AVAILABILITY_COLLECTION)
+      .where("month", "==", month)
+      .get()
 
-  return snapshot.docs
-    .map((doc) =>
-      normalizeAvailabilityRecord(doc.data() as Record<string, unknown>, doc.id),
-    )
-    .filter((record): record is AvailabilityRecord => record !== null)
+    return snapshot.docs
+      .map((doc) =>
+        normalizeAvailabilityRecord(
+          doc.data() as Record<string, unknown>,
+          doc.id,
+        ),
+      )
+      .filter((record): record is AvailabilityRecord => record !== null)
+  } catch (error) {
+    console.error("[data-store] getAvailabilityForMonth failed", error)
+    const records: AvailabilityRecord[] = []
+    for (const record of store.values()) {
+      if (record.date.startsWith(month)) {
+        records.push(record)
+      }
+    }
+    return records
+  }
 }
 
 /** Insert or update the status for a single rider/day. */
@@ -163,9 +182,14 @@ export async function upsertAvailability(
     return record
   }
 
-  await db.collection(AVAILABILITY_COLLECTION).doc(record.id).set(record, {
-    merge: true,
-  })
+  try {
+    await db.collection(AVAILABILITY_COLLECTION).doc(record.id).set(record, {
+      merge: true,
+    })
+  } catch (error) {
+    console.error("[data-store] upsertAvailability failed", error)
+    store.set(record.id, record)
+  }
 
   return record
 }

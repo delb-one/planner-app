@@ -6,6 +6,8 @@ import {
 } from "@/lib/data-store"
 import type { AvailabilityStatus } from "@/types"
 
+export const runtime = "nodejs"
+
 const VALID_STATUSES: AvailabilityStatus[] = [
   "available",
   "unsure",
@@ -25,8 +27,18 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const records = await getAvailabilityForMonth(month)
-  return NextResponse.json({ records })
+  try {
+    const records = await getAvailabilityForMonth(month)
+    return NextResponse.json({ records })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        records: [],
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -59,6 +71,15 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const record = await upsertAvailability(riderId, date, status)
-  return NextResponse.json({ record })
+  try {
+    const record = await upsertAvailability(riderId, date, status)
+    return NextResponse.json({ record })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    )
+  }
 }
