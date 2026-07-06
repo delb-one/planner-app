@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 
-import { RIDERS } from "@/lib/riders"
+import { getRiders } from "@/lib/data-store"
 
 export async function GET() {
-  return NextResponse.json({ riders: RIDERS })
+  const riders = await getRiders()
+  return NextResponse.json({ riders })
 }

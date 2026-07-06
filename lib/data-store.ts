@@ -1,17 +1,12 @@
 import "server-only"
 
-import type { AvailabilityRecord, AvailabilityStatus } from "@/types"
+import { RIDERS } from "@/lib/riders"
+import { getFirestoreDb } from "@/lib/firebase-admin"
+import type { AvailabilityRecord, AvailabilityStatus, Rider } from "@/types"
 
-/**
- * Simple in-memory availability store that mirrors the `availability` table
- * (id, rider_id, date, status) with a unique constraint on (rider_id, date).
- *
- * This keeps the app fully functional without a database connected. To move to
- * Supabase, swap the bodies of these functions for SQL queries — the shapes are
- * intentionally identical to the requested schema.
- *
- * A module-level global is used so the data survives hot reloads in dev.
- */
+const AVAILABILITY_COLLECTION = "availability"
+const RIDERS_COLLECTION = "riders"
+
 type Store = Map<string, AvailabilityRecord>
 
 const globalForStore = globalThis as unknown as {
@@ -27,30 +22,137 @@ function key(riderId: string, date: string): string {
   return `${riderId}:${date}`
 }
 
-/** Return every record whose date falls within the given "yyyy-MM" month. */
-export function getAvailabilityForMonth(month: string): AvailabilityRecord[] {
-  const records: AvailabilityRecord[] = []
-  for (const record of store.values()) {
-    if (record.date.startsWith(month)) {
-      records.push(record)
-    }
-  }
-  return records
+function toMonth(date: string): string {
+  return date.slice(0, 7)
 }
 
-/** Insert or update the status for a single rider/day. */
-export function upsertAvailability(
+function toRecord(
   riderId: string,
   date: string,
   status: AvailabilityStatus,
 ): AvailabilityRecord {
-  const id = key(riderId, date)
-  const record: AvailabilityRecord = {
-    id,
+  return {
+    id: key(riderId, date),
     rider_id: riderId,
     date,
+    month: toMonth(date),
     status,
   }
-  store.set(id, record)
+}
+
+function normalizeAvailabilityRecord(
+  data: Record<string, unknown>,
+  fallbackId: string,
+): AvailabilityRecord | null {
+  const riderId = typeof data.rider_id === "string" ? data.rider_id : null
+  const date = typeof data.date === "string" ? data.date : null
+  const status =
+    data.status === "available" ||
+    data.status === "unsure" ||
+    data.status === "unavailable"
+      ? data.status
+      : null
+
+  if (!riderId || !date || !status) {
+    return null
+  }
+
+  return {
+    id: typeof data.id === "string" ? data.id : fallbackId,
+    rider_id: riderId,
+    date,
+    month:
+      typeof data.month === "string" && data.month
+        ? data.month
+        : toMonth(date),
+    status,
+  }
+}
+
+/**
+ * Firestore-backed storage when credentials are available, with a local
+ * in-memory fallback for development without Firebase configured.
+ */
+export async function getRiders(): Promise<Rider[]> {
+  const db = getFirestoreDb()
+  if (!db) {
+    return RIDERS
+  }
+
+  const snapshot = await db
+    .collection(RIDERS_COLLECTION)
+    .orderBy("name")
+    .get()
+
+  if (snapshot.empty) {
+    const batch = db.batch()
+    for (const rider of RIDERS) {
+      batch.set(db.collection(RIDERS_COLLECTION).doc(rider.id), rider)
+    }
+    await batch.commit()
+    return RIDERS
+  }
+
+  return snapshot.docs
+    .map((doc) => {
+      const data = doc.data()
+      const name = typeof data.name === "string" ? data.name : null
+      const color = typeof data.color === "string" ? data.color : null
+      return name && color
+        ? {
+            id: doc.id,
+            name,
+            color,
+          }
+        : null
+    })
+    .filter((rider): rider is Rider => rider !== null)
+}
+
+/** Return every record whose date falls within the given "yyyy-MM" month. */
+export async function getAvailabilityForMonth(
+  month: string,
+): Promise<AvailabilityRecord[]> {
+  const db = getFirestoreDb()
+  if (!db) {
+    const records: AvailabilityRecord[] = []
+    for (const record of store.values()) {
+      if (record.date.startsWith(month)) {
+        records.push(record)
+      }
+    }
+    return records
+  }
+
+  const snapshot = await db
+    .collection(AVAILABILITY_COLLECTION)
+    .where("month", "==", month)
+    .get()
+
+  return snapshot.docs
+    .map((doc) =>
+      normalizeAvailabilityRecord(doc.data() as Record<string, unknown>, doc.id),
+    )
+    .filter((record): record is AvailabilityRecord => record !== null)
+}
+
+/** Insert or update the status for a single rider/day. */
+export async function upsertAvailability(
+  riderId: string,
+  date: string,
+  status: AvailabilityStatus,
+): Promise<AvailabilityRecord> {
+  const record = toRecord(riderId, date, status)
+  const db = getFirestoreDb()
+
+  if (!db) {
+    store.set(record.id, record)
+    return record
+  }
+
+  await db.collection(AVAILABILITY_COLLECTION).doc(record.id).set(record, {
+    merge: true,
+  })
+
   return record
 }

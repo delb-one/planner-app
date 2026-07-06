@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  const records = getAvailabilityForMonth(month)
+  const records = await getAvailabilityForMonth(month)
   return NextResponse.json({ records })
 }
 
@@ -59,6 +59,6 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const record = upsertAvailability(riderId, date, status)
+  const record = await upsertAvailability(riderId, date, status)
   return NextResponse.json({ record })
 }

@@ -11,6 +11,8 @@ export interface AvailabilityRecord {
   rider_id: string
   /** ISO date string, format: yyyy-MM-dd */
   date: string
+  /** Month bucket string, format: yyyy-MM */
+  month: string
   status: AvailabilityStatus
 }
 

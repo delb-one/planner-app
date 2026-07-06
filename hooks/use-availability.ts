@@ -51,6 +51,7 @@ export function useMonthAvailability(month: string) {
         id: cellKey(riderId, date),
         rider_id: riderId,
         date,
+        month: date.slice(0, 7),
         status,
       }
 

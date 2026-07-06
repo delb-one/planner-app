@@ -15,7 +15,7 @@ import { cellKey } from "@/hooks/use-availability"
 import type { AvailabilityMap, AvailabilityStatus } from "@/types"
 import { DayCell } from "./day-cell"
 
-const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+const WEEKDAYS = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
 
 interface MonthCalendarProps {
   month: Date
