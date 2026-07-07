@@ -39,7 +39,7 @@ export function StatsCards({
   }, [month, riderId, availability])
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-3 gap-3 ">
       {CARDS.map((status) => {
         const meta = STATUS_META[status]
         return (
@@ -62,9 +62,9 @@ export function StatsCards({
                     {counts[status]}
                   </span>
                 )}
-                <span className="mt-1 text-xs text-muted-foreground">
+                {/* <span className="mt-1 text-xs text-muted-foreground">
                   {meta.label} {counts[status] === 1 ? "day" : "days"}
-                </span>
+                </span> */}
               </div>
             </CardContent>
           </Card>
